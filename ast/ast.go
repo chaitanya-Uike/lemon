@@ -138,3 +138,51 @@ func (rs *ReturnStatement) String() string {
 	}
 	return out.String()
 }
+
+type AlternateStatement interface {
+	Statement
+	alternateStatementNode()
+}
+
+type BlockStatement struct {
+	Token      token.Token
+	Statements []Statement
+}
+
+func (bs *BlockStatement) statementNode()       {}
+func (bs *BlockStatement) TokenLiteral() string { return bs.Token.Literal }
+func (bs *BlockStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString("{")
+	for _, stmt := range bs.Statements {
+		out.WriteString(stmt.String())
+	}
+	out.WriteString("}")
+	return out.String()
+}
+func (bs *BlockStatement) alternateStatementNode() {}
+
+type IfStatement struct {
+	Token       token.Token
+	Condition   Expression
+	Consequence *BlockStatement
+	Alternate   AlternateStatement
+}
+
+func (is *IfStatement) statementNode()          {}
+func (is *IfStatement) alternateStatementNode() {}
+func (is *IfStatement) TokenLiteral() string    { return is.Token.Literal }
+func (is *IfStatement) String() string {
+	var out bytes.Buffer
+
+	out.WriteString("if")
+	out.WriteString(" " + is.Condition.String() + " ")
+	out.WriteString(is.Consequence.String())
+
+	if is.Alternate != nil {
+		out.WriteString("else")
+		out.WriteString(" " + is.Alternate.String())
+	}
+
+	return out.String()
+}

@@ -34,7 +34,7 @@ const (
 
 	COMMA = ","
 	/*
-		 * auto added by lexer using following rules
+		 * semicolon auto added by lexer using following rules
 			* after a line's final token (i.e. token before '\n')
 			* if that last token is one of:
 				* identifier

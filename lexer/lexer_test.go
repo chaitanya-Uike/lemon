@@ -16,7 +16,7 @@ func TestNextToken(t *testing.T) {
 
 	result = add(five, ten)
 
-	float = result + 2.5
+	float = result + 2.5;
 	!-/*5
 	5 < 10 > 5
 

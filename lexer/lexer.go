@@ -89,6 +89,8 @@ func (l *Lexer) NextToken() token.Token {
 			l.readChar()
 			return l.NextToken()
 		}
+	case ';':
+		tok = newToken(token.SEMICOLON, l.ch)
 	case 0:
 		if l.shouldInsertSemicolon() {
 			tok = newToken(token.SEMICOLON, ';')

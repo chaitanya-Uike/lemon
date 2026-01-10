@@ -315,7 +315,7 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 			"(((a + (b * c)) + (d / e)) - f)",
 		},
 		{
-			"3 + 4\n -5 * 5",
+			"3 + 4; -5 * 5",
 			"(3 + 4)((-5) * 5)",
 		},
 		{
@@ -349,6 +349,25 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 		{
 			"3 < 5 == true",
 			"((3 < 5) == true)",
+		},
+		{
+			"1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)",
+		},
+		{
+			"(5 + 5) * 2",
+			"((5 + 5) * 2)",
+		},
+		{
+			"2 / (5 + 5)",
+			"(2 / (5 + 5))",
+		},
+		{
+			"-(5 + 5)",
+			"(-(5 + 5))",
+		},
+		{
+			"!(true == true)",
+			"(!(true == true))",
 		},
 	}
 
@@ -404,4 +423,201 @@ func checkParserErrors(t *testing.T, p *Parser) {
 		t.Errorf("parser error: %q", msg)
 	}
 	t.FailNow()
+}
+
+func TestIfStatement(t *testing.T) {
+	input := `if x < y { 10 }`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("Expected %d Statementes, got %d", 1, len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*ast.IfStatement)
+	if !ok {
+		t.Fatalf("Expected statement of type *ast.IfStatement, got %T", stmt)
+	}
+
+	cond, ok := stmt.Condition.(*ast.InfixExpression)
+	if !ok {
+		t.Fatalf("Expected condition to be of type *ast.InfixExpression, got %T", cond)
+	}
+
+	testInfixExpression(t, cond, "x", "<", "y")
+
+	if len(stmt.Consequence.Statements) != 1 {
+		t.Fatalf("Expected %d statements in consequence block, got %d", 1, len(stmt.Consequence.Statements))
+	}
+
+	exp, ok := stmt.Consequence.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("Expected *ast.ExpressionStatement, got %T", exp)
+	}
+
+	intLiteral, ok := exp.Expression.(*ast.IntegerLiteral)
+	if !ok {
+		t.Fatalf("Expected *ast.IdentifierLiteral, got %T", intLiteral)
+	}
+
+	if intLiteral.Value != 10 {
+		t.Fatalf("Expected intLiteral.Value to be %d, got %d", 10, intLiteral.Value)
+	}
+
+	if stmt.Alternate != nil {
+		t.Fatalf("Alternate was not nil")
+	}
+}
+
+func TestIfElseStatement(t *testing.T) {
+	input := `if x < y { 10 } else { z }`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("Expected %d Statementes, got %d", 1, len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*ast.IfStatement)
+	if !ok {
+		t.Fatalf("Expected statement of type *ast.IfStatement, got %T", stmt)
+	}
+
+	cond, ok := stmt.Condition.(*ast.InfixExpression)
+	if !ok {
+		t.Fatalf("Expected condition to be of type *ast.InfixExpression, got %T", cond)
+	}
+
+	testInfixExpression(t, cond, "x", "<", "y")
+
+	if len(stmt.Consequence.Statements) != 1 {
+		t.Fatalf("Expected %d statements in consequence block, got %d", 1, len(stmt.Consequence.Statements))
+	}
+
+	exp, ok := stmt.Consequence.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("Expected *ast.ExpressionStatement, got %T", exp)
+	}
+
+	intLiteral, ok := exp.Expression.(*ast.IntegerLiteral)
+	if !ok {
+		t.Fatalf("Expected *ast.IdentifierLiteral, got %T", intLiteral)
+	}
+
+	if intLiteral.Value != 10 {
+		t.Fatalf("Expected intLiteral.Value to be %d, got %d", 10, intLiteral.Value)
+	}
+
+	if stmt.Alternate == nil {
+		t.Fatalf("Alternate statement was found to be nil")
+	}
+
+	elseStmt, ok := stmt.Alternate.(*ast.BlockStatement)
+	if !ok {
+		t.Fatalf("Expected alternate to be *ast.BlockStatement, got %T", elseStmt)
+	}
+
+	if len(elseStmt.Statements) != 1 {
+		t.Fatalf("Expected else block to have %d statements, got %d", 1, len(elseStmt.Statements))
+	}
+
+	elseExp, ok := elseStmt.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("Expected else block statement to be *ast.ExpressionStatement, got %T", elseExp)
+	}
+
+	testIdentiferLiteral(t, elseExp.Expression, "z")
+}
+
+func TestIfElseIfStatement(t *testing.T) {
+	input := `if x < y { 10 } else if x > y { 20 } else { 30 }`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("Expected %d Statements, got %d", 1, len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*ast.IfStatement)
+	if !ok {
+		t.Fatalf("Expected statement of type *ast.IfStatement, got %T", stmt)
+	}
+
+	cond, ok := stmt.Condition.(*ast.InfixExpression)
+	if !ok {
+		t.Fatalf("Expected condition to be of type *ast.InfixExpression, got %T", cond)
+	}
+	testInfixExpression(t, cond, "x", "<", "y")
+
+	if len(stmt.Consequence.Statements) != 1 {
+		t.Fatalf("Expected %d statements in consequence block, got %d", 1, len(stmt.Consequence.Statements))
+	}
+	exp, ok := stmt.Consequence.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("Expected *ast.ExpressionStatement, got %T", exp)
+	}
+	intLiteral, ok := exp.Expression.(*ast.IntegerLiteral)
+	if !ok {
+		t.Fatalf("Expected *ast.IntegerLiteral, got %T", intLiteral)
+	}
+	if intLiteral.Value != 10 {
+		t.Fatalf("Expected intLiteral.Value to be %d, got %d", 10, intLiteral.Value)
+	}
+
+	if stmt.Alternate == nil {
+		t.Fatalf("Alternate statement was found to be nil")
+	}
+	elseIfStmt, ok := stmt.Alternate.(*ast.IfStatement)
+	if !ok {
+		t.Fatalf("Expected alternate to be *ast.IfStatement (else if), got %T", stmt.Alternate)
+	}
+
+	elseIfCond, ok := elseIfStmt.Condition.(*ast.InfixExpression)
+	if !ok {
+		t.Fatalf("Expected else if condition to be *ast.InfixExpression, got %T", elseIfStmt.Condition)
+	}
+	testInfixExpression(t, elseIfCond, "x", ">", "y")
+
+	if len(elseIfStmt.Consequence.Statements) != 1 {
+		t.Fatalf("Expected %d statements in else if consequence block, got %d", 1, len(elseIfStmt.Consequence.Statements))
+	}
+	elseIfExp, ok := elseIfStmt.Consequence.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("Expected *ast.ExpressionStatement in else if, got %T", elseIfExp)
+	}
+	elseIfIntLiteral, ok := elseIfExp.Expression.(*ast.IntegerLiteral)
+	if !ok {
+		t.Fatalf("Expected *ast.IntegerLiteral in else if, got %T", elseIfIntLiteral)
+	}
+	if elseIfIntLiteral.Value != 20 {
+		t.Fatalf("Expected else if intLiteral.Value to be %d, got %d", 20, elseIfIntLiteral.Value)
+	}
+
+	if elseIfStmt.Alternate == nil {
+		t.Fatalf("Expected else if to have alternate (final else), got nil")
+	}
+	elseStmt, ok := elseIfStmt.Alternate.(*ast.BlockStatement)
+	if !ok {
+		t.Fatalf("Expected final else to be *ast.BlockStatement, got %T", elseIfStmt.Alternate)
+	}
+	if len(elseStmt.Statements) != 1 {
+		t.Fatalf("Expected else block to have %d statements, got %d", 1, len(elseStmt.Statements))
+	}
+	elseExp, ok := elseStmt.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("Expected else block statement to be *ast.ExpressionStatement, got %T", elseExp)
+	}
+	elseIntLiteral, ok := elseExp.Expression.(*ast.IntegerLiteral)
+	if !ok {
+		t.Fatalf("Expected *ast.IntegerLiteral in else, got %T", elseIntLiteral)
+	}
+	if elseIntLiteral.Value != 30 {
+		t.Fatalf("Expected else intLiteral.Value to be %d, got %d", 30, elseIntLiteral.Value)
+	}
 }
