@@ -1,0 +1,193 @@
+package evaluator
+
+import (
+	"testing"
+
+	"github.com/chaitanya-Uike/lemon/lexer"
+	"github.com/chaitanya-Uike/lemon/object"
+	"github.com/chaitanya-Uike/lemon/parser"
+)
+
+func TestEvalIntegerExpression(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{"5", 5},
+		{"10", 10},
+		{"-5", -5},
+		{"-10", -10},
+		{"5 + 5 + 5 + 5 - 10", 10},
+		{"2 * 2 * 2 * 2 * 2", 32},
+		{"-50 + 100 + -50", 0},
+		{"5 * 2 + 10", 20},
+		{"5 + 2 * 10", 25},
+		{"20 + 2 * -10", 0},
+		{"50 / 2 * 2 + 10", 60},
+		{"2 * (5 + 10)", 30},
+		{"3 * 3 * 3 + 10", 37},
+		{"3 * (3 * 3) + 10", 37},
+		{"(5 + 10 * 2 + 15 / 3) * 2 + -10", 50},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testIntegerObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestEvalFloatExpression(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected float64
+	}{
+		{"2.5", 2.5},
+		{"0.0015", 0.0015},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testFloatObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestEvalBooleanExpression(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"true", true},
+		{"false", false},
+		{"1 < 2", true},
+		{"1 > 2", false},
+		{"1 < 1", false},
+		{"1 > 1", false},
+		{"1 == 1", true},
+		{"1 != 1", false},
+		{"1 == 2", false},
+		{"1 != 2", true},
+		{"true == true", true},
+		{"false == false", true},
+		{"true == false", false},
+		{"true != false", true},
+		{"false != true", true},
+		{"(1 < 2) == true", true},
+		{"(1 < 2) == false", false},
+		{"(1 > 2) == true", false},
+		{"(1 > 2) == false", true},
+	}
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testBooleanObject(t, evaluated, tt.expected)
+	}
+}
+
+func testEval(input string) object.Object {
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	env := object.NewEnvironment()
+
+	return Eval(program, env)
+}
+
+func testIntegerObject(t *testing.T, obj object.Object, expected int64) bool {
+	result, ok := obj.(*object.Integer)
+	if !ok {
+		t.Errorf("object is not Integer. got=%T (%+v)", obj, obj)
+		return false
+	}
+	if result.Value != expected {
+		t.Errorf("object has wrong value. got=%d, want=%d",
+			result.Value, expected)
+		return false
+	}
+	return true
+}
+
+func testFloatObject(t *testing.T, obj object.Object, expected float64) bool {
+	result, ok := obj.(*object.Float)
+	if !ok {
+		t.Errorf("object is not Float. got=%T (%+v)", obj, obj)
+		return false
+	}
+	if result.Value != expected {
+		t.Errorf("object has wrong value. got=%g, want=%g",
+			result.Value, expected)
+		return false
+	}
+	return true
+}
+
+func testBooleanObject(t *testing.T, obj object.Object, expected bool) bool {
+	result, ok := obj.(*object.Boolean)
+	if !ok {
+		t.Errorf("object is not Boolean. got=%T (%+v)", obj, obj)
+		return false
+	}
+	if result.Value != expected {
+		t.Errorf("object has wrong value. got=%t, want=%t",
+			result.Value, expected)
+		return false
+	}
+	return true
+}
+
+func TestBangOperator(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"!true", false},
+		{"!false", true},
+		{"!5", false},
+		{"!!true", true},
+		{"!!false", false},
+		{"!!5", true},
+	}
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testBooleanObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestErrorHandling(t *testing.T) {
+	tests := []struct {
+		input           string
+		expectedMessage string
+	}{
+		{
+			"5 + true;",
+			"type mismatch: INTEGER + BOOLEAN",
+		},
+		{
+			"5 + true; 5;",
+			"type mismatch: INTEGER + BOOLEAN",
+		},
+		{
+			"-true",
+			"unknown operator: -BOOLEAN",
+		},
+		{
+			"true + false;",
+			"unknown operator: BOOLEAN + BOOLEAN",
+		},
+		{
+			"5; true + false; 5",
+			"unknown operator: BOOLEAN + BOOLEAN",
+		},
+	}
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		errObj, ok := evaluated.(*object.Error)
+		if !ok {
+			t.Errorf("no error object returned. got=%T(%+v)",
+				evaluated, evaluated)
+			continue
+		}
+		if errObj.Message != tt.expectedMessage {
+			t.Errorf("wrong error message. expected=%q, got=%q",
+				tt.expectedMessage, errObj.Message)
+		}
+	}
+}
